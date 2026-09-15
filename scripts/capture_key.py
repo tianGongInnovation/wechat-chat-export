@@ -1,22 +1,32 @@
 # -*- coding: utf-8 -*-
 r"""
-微信 4.x (Windows) 数据库密钥捕获
+微信 4.x (Windows) 数据库密钥捕获（半自动，需使用者确认）
 原理: 微信重启后在登录阶段 Hook SetDBKey, 登录时微信自动调用并写入数据库密钥。
 需要用户配合: 重启微信后在手机上确认登录 (或扫码)。
+
 用法:
   python capture_key.py --wechat-exe "D:\WeiXin\Weixin.exe" --out <目录>
 可选:
   --close-first      自动结束当前运行的微信 (需先征得用户同意)
   --poll-seconds 240 捕获等待秒数
-  --dll <path>       wx_key.dll 路径 (默认: 自动查找, 找不到则自动下载)
+  --dll <path>       wx_key.dll 路径 (默认: 自动查找; 找不到则征求同意后下载)
+
+密钥捕获组件获取规则 (透明可控):
+  1) 本技能不附带任何第三方组件;
+  2) 优先使用本机已有的 wx_key.dll;
+  3) 都没有时, 脚本会完整说明将下载的工具、用途、来源, 征求使用者同意:
+     - 同意  -> 从固定版本地址下载一次, 之后本机复用不再下载;
+     - 不同意 -> 立即终止, 不下载任何东西 (可手动放置组件后重跑)。
+  4) 智能体代跑时: 先向使用者说明并取得同意, 再加 --yes-download 传入;
+     未取得同意时不得加此参数。脚本在无法交互且未获同意时拒绝下载。
 成功时在 --out 写入 key.txt (64位hex, 小写)。
 """
-import argparse, ctypes, ctypes.wintypes as w, json, os, re, shutil, subprocess, sys, tempfile, time, urllib.request, zipfile
+import argparse, ctypes, ctypes.wintypes as w, os, re, shutil, subprocess, sys, tempfile, time, urllib.request, zipfile
 
-# 密钥捕获组件 wx_key.dll 的自动获取来源 (微信导出工具 WXexport-tool 的 GitHub 发布包)
-_RELEASE_API = 'https://api.github.com/repos/Ray0612/WeChat-Export-Tool/releases/latest'
-_FALLBACK_ZIP = 'https://github.com/Ray0612/WeChat-Export-Tool/releases/download/v1.2.0/WXexport-tool-v1.2.0.zip'
-_USER_AGENT = 'wx-key-auto-download'
+# 密钥捕获组件 wx_key.dll 的唯一固定来源 (微信导出工具 WXexport-tool 的公开发布包, 固定版本便于核查)
+_DOWNLOAD_URL = 'https://github.com/Ray0612/WeChat-Export-Tool/releases/download/v1.2.0/WXexport-tool-v1.2.0.zip'
+_DOWNLOAD_VERSION_NOTE = 'WXexport-tool v1.2.0 (公开发布包, 其中包含密钥捕获组件 wx_key.dll)'
+_USER_AGENT = 'wx-key-consent-download'
 
 
 def log(*a):
@@ -113,36 +123,52 @@ def _download(url, dest):
                             pct, done / 1024 / 1024, total / 1024 / 1024))
 
 
-def acquire_dll(dest_path):
-    """从公开来源下载第三方密钥捕获工具并解出 wx_key.dll, 写入 dest_path。返回实际落地路径。"""
-    log('未找到密钥捕获组件, 现在自动下载所需的第三方密钥捕获工具 (仅需一次)。')
-
-    # 1) 解析下载地址: 优先查最新发布, 失败则用固定 v1.2.0
-    url = None
+def ask_consent(args):
+    """下载前完整披露并征求使用者同意。返回 True 表示同意。"""
+    print('=' * 62)
+    print('本机未找到密钥捕获组件, 需要下载一个第三方工具才能继续。')
+    print('-' * 62)
+    print('下载什么 : %s' % _DOWNLOAD_VERSION_NOTE)
+    print('干什么用 : 仅取其中的 wx_key.dll, 用于本机捕获微信登录时的')
+    print('           数据库密钥 (重启微信登录一次即可捕获, 之后长期复用)')
+    print('从哪下载 : %s' % _DOWNLOAD_URL)
+    print('怎么用   : 只在本机使用, 密钥只写入本机文件, 不上传、不外传')
+    print('只需下载 : 一次 (之后每次都直接复用, 不再下载)')
+    print('-' * 62)
+    if args.yes_download:
+        log('已收到使用者的明确同意 (--yes-download), 开始下载。')
+        return True
+    if not sys.stdin.isatty():
+        print('当前无法交互确认, 且未取得使用者同意, 不下载。')
+        print('如需下载: 请先向使用者说明以上内容并取得同意, 再加参数 --yes-download 重跑。')
+        return False
     try:
-        req = urllib.request.Request(_RELEASE_API, headers={'User-Agent': _USER_AGENT})
-        with urllib.request.urlopen(req, timeout=30) as r:
-            data = json.loads(r.read().decode('utf-8'))
-        for a in data.get('assets', []):
-            name = (a.get('name') or '').lower()
-            if name.endswith('.zip'):
-                url = a.get('browser_download_url')
-                break
-    except Exception:
-        url = None
-    if not url:
-        url = _FALLBACK_ZIP
-        log('  使用固定版本下载地址。')
+        ans = input('是否同意下载? (y=同意 / n=不同意): ').strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        ans = 'n'
+    if ans in ('y', 'yes'):
+        return True
+    print()
+    print('已按您的选择终止, 未下载任何东西。')
+    print('如之后想用, 两种方式任选:')
+    print('  1) 重跑本脚本, 在询问时回答 y;')
+    print('  2) 自行获取 wx_key.dll 放到技能的 bin/ 目录下, 重跑即可。')
+    return False
 
-    # 2) 下载压缩包 (缓存到临时目录, 已下载过则跳过)
-    zip_path = os.path.join(tempfile.gettempdir(), 'WXexport-tool.zip')
+
+def acquire_dll(dest_path, args):
+    """征求同意后, 从固定版本地址下载第三方密钥捕获工具并解出 wx_key.dll。返回实际落地路径。"""
+    if not ask_consent(args):
+        raise SystemExit('已终止 (使用者不同意下载), 未做任何更改。')
+
+    log('开始下载组件 ...')
+    zip_path = os.path.join(tempfile.gettempdir(), 'WXexport-tool-v1.2.0.zip')
     if os.path.isfile(zip_path) and os.path.getsize(zip_path) > 1024 * 1024:
-        log('  检测到已下载的组件, 跳过重复下载。')
+        log('  检测到本机已有已下载的组件包, 跳过重复下载。')
     else:
-        log('  正在下载 (请耐心等待, 进度如下)...')
-        _download(url, zip_path)
+        _download(_DOWNLOAD_URL, zip_path)
 
-    # 3) 解出 wx_key.dll (取名字以 wx_key.dll 结尾、体积最大的那份)
+    # 解出 wx_key.dll (取名字以 wx_key.dll 结尾、体积最大的那份)
     log('  正在安装组件 ...')
     target = None
     with zipfile.ZipFile(zip_path) as z:
@@ -166,12 +192,12 @@ def acquire_dll(dest_path):
 
     if not (os.path.isfile(dest_path) and os.path.getsize(dest_path) > 1024):
         raise SystemExit('解出的 wx_key.dll 无效 (可能下载损坏), 请删除临时压缩包后重试。')
-    log('  组件已就绪。')
+    log('  组件已就绪 (仅本机使用)。')
     return dest_path
 
 
 def resolve_dll(args):
-    """按优先级确定 wx_key.dll 路径: 显式路径 -> 技能自带 -> 本机现成 -> 自动下载。"""
+    """按优先级确定 wx_key.dll 路径: 显式路径 -> 技能自带 -> 本机现成 -> 征得同意后下载。"""
     if args.dll:
         if os.path.isfile(args.dll):
             return os.path.abspath(args.dll)
@@ -186,7 +212,7 @@ def resolve_dll(args):
         log('已在电脑上找到现成的 wx_key.dll (无需下载): %s' % local)
         return local
 
-    return acquire_dll(bundled)
+    return acquire_dll(bundled, args)
 
 
 def load_api(dll_path):
@@ -219,7 +245,9 @@ def main():
     ap.add_argument('--out', required=True, help='输出目录, 密钥写入该目录的 key.txt')
     ap.add_argument('--close-first', action='store_true', help='先自动结束已运行的微信 (使用前请先获得用户同意)')
     ap.add_argument('--poll-seconds', type=int, default=240)
-    ap.add_argument('--dll', default=None, help='wx_key.dll 路径 (默认: 自动查找/下载)')
+    ap.add_argument('--dll', default=None, help='wx_key.dll 路径 (默认: 自动查找; 找不到则征求同意后下载)')
+    ap.add_argument('--yes-download', action='store_true',
+                    help='使用者已明确同意下载密钥捕获组件 (智能体须先向使用者说明并取得同意后才可使用)')
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -283,7 +311,7 @@ def main():
                 return
         drain_status()
         time.sleep(0.2)
-    log('超时未捕获。常见原因: 登录发生在 Hook 安装之前。请关闭微信重试 (先开脚本再登录)。')
+    log('超时未捕获。常见原因: 登录完成早于 Hook 安装。请关闭微信重试 (先开脚本再登录)。')
     api['CleanupHook']()
     raise SystemExit('timeout')
 
