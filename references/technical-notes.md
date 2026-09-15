@@ -1,12 +1,12 @@
-# 微信 4.x 解密与导出技术笔记
+# 微信 4.x 本地数据库解密与导出技术笔记
 
-本文是脚本工作所需的底层事实，供排查问题时阅读。
+本文是导出脚本工作所需的底层事实，供排查问题时阅读。
 
 ## 库结构与加密
 
-- 数据根：`E:\微信聊天信息\xwechat_files\wxid_<id>_<后缀>\db_storage\`
+- 数据根目录下每个账号一个文件夹：`wxid_<id>_<后缀>\db_storage\`
 - 关键库：
-  - `message\message_<n>.db`：消息主体，按时间段分区（实测 message_2≈2025-04、message_1≈2025-09~2026-08；编号越大越新不成立，需看数据）
+  - `message\message_<n>.db`：消息主体，按时间段分区（编号与时间的对应关系需看数据确认）
   - `contact\contact.db`：联系人（`username/remark/nick_name/alias`）
   - `session\session.db`：会话表 `SessionTable(username, last_timestamp, summary, ...)`
 - SQLCipher 4，页 4096，reserve 80：
@@ -23,7 +23,7 @@
 
 - 某联系人的消息表名 = `Msg_` + `MD5(对方wxid)` 的小写 hex。
 - `Name2Id(user_name, is_session)`：`real_sender_id` 指向其 rowid。
-- **发送者映射逐库可能翻转**（message_1 里 rowid1=本人，message_2 里 rowid1=对方），一律按每个库自己的 Name2Id 解析，禁止硬编码 1/2。
+- **发送者映射逐库可能翻转**（不同分库里 rowid1 可能是本人也可能是对方），一律按每个库自己的 Name2Id 解析，禁止硬编码 1/2。
 - `local_type` 高 32 位带压缩标记，取其低 16 位即微信标准类型：1文本、3图片、34语音、43视频、47表情、49链接/转账卡片、50通话、10000系统。
 - `message_content` 可能以 ZSTD 帧存储（魔数 `28 b5 2f fd`），用 zstandard 直接解压。
 - `create_time` 为 Unix 秒（UTC），导出显示按 `UTC+8`。
@@ -31,21 +31,20 @@
 ## 已验证结论（实测 4.1.13.12）
 
 - WAL（`-wal`）帧头被魔改，主库文件本身完整；导出以**主库**为准。会话表最后时间若略晚于主库最后时间，说明少量新消息尚未合并进主库。
-- 导出完整性用会话表锚定：`SessionTable.last_timestamp` 应等于导出最大 `create_time`（本地案例：2026-08-19 18:06:51 完全一致）。
+- 导出完整性用会话表锚定：`SessionTable.last_timestamp` 应等于导出最大 `create_time`。
 - 主库文件在微信运行时被独占锁定，需 `CreateFileW(..., FILE_SHARE_READ|WRITE|DELETE, ...)` 读取（脚本已内置 `shared_read`）。
 
-## 密钥捕获要点（SetDBKey 路线）
+## 数据库密钥说明
 
-- 微信只在**启动登录早期**调用 `SetDBKey`；登录后/退出登录都不会触发。捕获必须“先关微信 → 注入 Hook → 用户再登录”。
-- `wx_key.dll` 导出：`InitializeHook(uint32 pid)`、`PollKeyData(char*,int)`、`GetStatusMessage(char*,int,int*)`、`CleanupHook()`、`GetLastErrorMsg()`。
-- 捕获到的是 64 位 hex（32 字节口令）。用任意库第 1 页 HMAC 即可验证。
-- 已捕获的密钥可能长期有效（实测同日 21:25 捕获的密钥在多次重启后仍能解锁全部库），可先找旧 key.txt 免重启。
+- 密钥是 64 位 hex（32 字节口令）。用任意库第 1 页 HMAC 即可验证密钥是否对应该账号目录。
+- 已保存的密钥可能长期有效（实测同一密钥在多次重启后仍能解锁全部库），可复用旧密钥免重复验证。
 
-## 曾失败/慎用的路线
+## 密钥捕获要点（SetDBKey 路线，仅本机使用）
 
-- 内存中 `x'<hex>'` 字符串扫描：4.1.11+ 已不存在，废弃。
-- Frida 结构/口令全内存扫描：偏移随版本变，本机 1726 候选全部未命中；且反复 attach 可能导致微信反调试自退出。
-- 不建议重启微信超过必要次数；每次重启都要求手机确认。
+- 微信只在**启动登录早期**调用 `SetDBKey`；登录后/退出登录都不会触发。捕获必须"先关微信 → 组件就绪 → 用户再登录"。
+- 捕获组件为 `wx_key.dll`（A 包随包附带；B 包在本机没有时，脚本会完整披露并征求使用者同意后才获取，不同意则终止）。
+- 组件导出接口：`InitializeHook(uint32 pid)`、`PollKeyData(char*,int)`、`GetStatusMessage(char*,int,int*)`、`CleanupHook()`、`GetLastErrorMsg()`。
+- 捕获到的是 64 位 hex（32 字节口令），只写入本机 `key.txt`，不上传不外传。
 
 ## 输出格式约定
 
