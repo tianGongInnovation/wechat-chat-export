@@ -6,7 +6,7 @@ r"""
 
 用法示例:
   python export_chat.py ^
-      --data-root "E:\微信聊天信息\xwechat_files" ^
+      --data-root "%USERPROFILE%\Documents\xwechat_files" ^
       --key-hex c8bfa3a5... (64位hex) ^
       --target 某人 ^
       --out-dir .\outputs
@@ -28,10 +28,9 @@ RESERVE = 80
 TZ = datetime.timezone(datetime.timedelta(hours=8))
 dctx = zstandard.ZstdDecompressor()
 DATA_ROOT_CANDIDATES = [
-    r'E:\微信聊天信息\xwechat_files',
-    r'D:\微信聊天信息\xwechat_files',
     os.path.expandvars(r'%USERPROFILE%\Documents\xwechat_files'),
     os.path.expandvars(r'%USERPROFILE%\Documents\WeChat Files'),
+    os.path.expandvars(r'%APPDATA%\Tencent\xwechat_files'),
 ]
 DEFAULT_OUT = os.path.join(os.getcwd(), 'outputs')
 
@@ -267,6 +266,9 @@ def main():
     ap.add_argument('--out-dir', default=DEFAULT_OUT)
     ap.add_argument('--date', default=datetime.datetime.now().strftime('%Y-%m-%d'))
     args = ap.parse_args()
+
+    if not args.target and not args.target_wxid:
+        raise SystemExit('需要 --target(联系人备注/昵称) 或 --target-wxid 之一')
 
     if args.key_file:
         key = open(args.key_file, encoding='ascii').read().strip()
