@@ -2,12 +2,12 @@
 name: wechat-chat-export
 description: 把 Windows 电脑版微信（4.x 版本）存在本机的聊天记录解密并导出来，变成三种好用的文件：一个可以像看聊天一样翻阅的 HTML 网页时间线、一份可用 Excel 打开的 CSV 表格、一份纯文本 TXT 文件。导出之后可以：把重要的客户沟通、项目电话记录长期留底；把聊天记录交给 AI 分析（比如整理某件事的来龙去脉）；按联系人分类整理历史消息；在电脑故障或换机之前把记录抢救出来。使用范围有明确边界：仅限导出您本人登录的微信账号数据，请勿用于查看他人聊天，并注意保护聊天内容中涉及的他人隐私。本技能提供两种安装方式：A 包自带所需组件、装完即用；B 包体积更小，首次使用时经您确认后自动获取所需组件。触发词：微信导出、聊天记录导出、导出微信聊天、微信聊天记录、把微信记录导出来、解密微信数据库、wechat export。
 agent_created: true
-version: 1.1.5
+version: 1.1.6
 author: 天工创新坊
 license: CC BY 4.0
 display_name: "微信聊天记录导出"
 display_name_en: WeChat Chat Export
-trigger: ["导出微信聊天记录", "微信导出", "聊天记录导出", "把微信记录导出来", "微信记录存档"]
+trigger: ["导出微信聊天记录", "微信导出", "聊天记录导出", "把微信记录导出来", "微信记录存档", "export WeChat chat history", "WeChat export", "export chat history", "archive WeChat records"]
 description_zh: "把电脑版微信（4.x）的聊天记录导出来，变成三种文件：像看聊天一样翻阅的网页时间线、表格软件可打开的 CSV、纯文本。客户沟通留底、交给 AI 分析、换机前抢救记录都用得上。仅限导出本人账号数据。"
 description_en: "Export chat history from Windows WeChat 4.x into three files: an HTML timeline you can browse like the chat itself, a CSV for spreadsheets, and plain text. Useful for archiving client conversations, feeding AI for analysis, or rescuing records before switching computers. Exports only your own account data."
 category: productivity
