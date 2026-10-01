@@ -2,14 +2,14 @@
 name: wechat-chat-export
 description: 把 Windows 电脑版微信（4.x 版本）存在本机的聊天记录解密并导出来，变成三种好用的文件：一个可以像看聊天一样翻阅的 HTML 网页时间线、一份可用 Excel 打开的 CSV 表格、一份纯文本 TXT 文件。导出之后可以：把重要的客户沟通、项目电话记录长期留底；把聊天记录交给 AI 分析（比如整理某件事的来龙去脉）；按联系人分类整理历史消息；在电脑故障或换机之前把记录抢救出来。使用范围有明确边界：仅限导出您本人登录的微信账号数据，请勿用于查看他人聊天，并注意保护聊天内容中涉及的他人隐私。本技能提供两种安装方式：A 包自带所需组件、装完即用；B 包体积更小，首次使用时经您确认后自动获取所需组件。触发词：微信导出、聊天记录导出、导出微信聊天、微信聊天记录、把微信记录导出来、解密微信数据库、wechat export。
 agent_created: true
-version: 1.1.3
+version: 1.1.5
 author: 天工创新坊
 license: CC BY 4.0
 display_name: "微信聊天记录导出"
 display_name_en: WeChat Chat Export
 trigger: ["导出微信聊天记录", "微信导出", "聊天记录导出", "把微信记录导出来", "微信记录存档"]
-description_zh: "将 Windows 微信 4.x 本地聊天记录导出为 HTML 时间线 / CSV / TXT（获取密钥组件前先征求使用者同意）"
-description_en: "Export Windows WeChat 4.x local chat history to HTML/CSV/TXT (asks for user consent before fetching the key-capture component)"
+description_zh: "把电脑版微信（4.x）的聊天记录导出来，变成三种文件：像看聊天一样翻阅的网页时间线、表格软件可打开的 CSV、纯文本。客户沟通留底、交给 AI 分析、换机前抢救记录都用得上。仅限导出本人账号数据。"
+description_en: "Export chat history from Windows WeChat 4.x into three files: an HTML timeline you can browse like the chat itself, a CSV for spreadsheets, and plain text. Useful for archiving client conversations, feeding AI for analysis, or rescuing records before switching computers. Exports only your own account data."
 category: productivity
 permissions: ["本地文件读取", "本地文件写入", "经用户确认后联网下载组件"]
 ---
@@ -122,3 +122,23 @@ python "<skill>\scripts\export_chat.py" `
 > 本技能仅用于处理**使用者本人**在本机合法持有的聊天数据，使用前应征得数据涉及各方的同意。请遵守所在国家或地区的法律法规与微信平台规则。导出内容含个人隐私，请妥善保管，不得外泄、不得用于侵害他人权益的用途。因使用本技能产生的一切后果由使用者自行承担。
 >
 > **组件来源致谢**：脚本在征得使用者同意后获取的密钥捕获组件 `wx_key.dll` 取自开源项目 WXexport-tool（v1.2.0，作者 Ray0612，github.com/Ray0612/WeChat-Export-Tool），感谢原作者的开放分享。该组件仅在本机使用，密钥只写入本机文件，不上传、不外传。
+
+## 使用反馈
+
+本技能仍在持续改进中。使用时遇到问题、感到不方便，或有任何建议与期待，欢迎告知，将在后续版本中完善：
+
+- 电子邮箱：gouzhongwu@vip.qq.com
+- 微信公众号「东方恒源技术创新」留言
+
+每一次反馈都会进入改进清单，感谢您花时间提出。
+
+## 关于我们
+
+本技能由**天工创新坊**开发并免费开放使用。
+
+天工创新坊是一个开放的技术创新小站，专注把成熟、廉价的技术组合起来，解决那些"解决不了、解决不好"的实际问题。所有技能都遵循同一原则：**把事情讲清楚，让不懂技术的人也能用起来。**
+
+- 空间主页（技能包 / 命令清单 / 更多工具）：https://www.workbuddy.cn/space/s/OvjPE71TnySWT8ojAVktVa
+- 使用中遇到问题、有改进建议，或希望定制类似工具，欢迎通过空间主页留言联系我们。
+
+本技能以 CC BY 4.0 协议开放，可自由使用、修改与再分发，请保留来源署名。
